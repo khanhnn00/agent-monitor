@@ -1,5 +1,5 @@
 'use strict';
-/* Zero-dependency SVG charts for the harness dashboard: stacked columns, heatmap, sparkline.
+/* Zero-dependency SVG charts for agent-monitor: stacked columns, heatmap, sparkline.
    Marks follow the dataviz spec — ≤24px columns with a 4px rounded data-end, 2px surface gaps,
    hairline grid, selective direct labels, a hover/focus tooltip filled with textContent only. */
 const Charts = (() => {

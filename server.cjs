@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Harness dashboard — zero-dependency HTTP server over a read-only ~/.claude.
+ * agent-monitor — zero-dependency HTTP server over a read-only ~/.claude.
  *
  *   GET /                  UI (public/)
  *   GET /api/state         Claude sessions per repo: status, intent, subagents, skills, context overhead
@@ -76,7 +76,7 @@ http.createServer((req, res) => {
   } catch (e) {
     return send(res, 500, JSON.stringify({ error: e.message }), 'application/json');
   }
-}).listen(PORT, HOST, () => console.log(`harness dashboard on http://${HOST}:${PORT} · data ${process.env.CLAUDE_DIR || '~/.claude'}`));
+}).listen(PORT, HOST, () => console.log(`agent-monitor on http://${HOST}:${PORT} · data ${process.env.CLAUDE_DIR || '~/.claude'}`));
 
 // The account % is only cached by the host hook; sample it continuously so past windows keep their last value.
 usage.sample();

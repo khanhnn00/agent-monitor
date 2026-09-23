@@ -1,4 +1,4 @@
-# cc-harness-dashboard
+# agent-monitor
 
 Local read-only dashboard over `~/.claude`: Claude Code sessions per repo, harness concerns, and this machine's share of the account's 5h usage limit. Zero-dependency Node, runs in Docker on `127.0.0.1:4317`; never sends data off the machine.
 
