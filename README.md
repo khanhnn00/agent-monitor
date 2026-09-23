@@ -17,7 +17,7 @@ Without Docker: `node server.cjs` (reads `~/.claude` directly).
 |---|---|
 | `/` | Claude sessions per repo: status, intent, subagents, skills, context overhead, activity charts |
 | `/concerns` | What the harness wastes (hook/skill token cost per week), with fixes |
-| `/usage` | Current 5h window (start → end), account %, this machine's %, weekly %, past windows (8 days) |
+| `/usage` | Current 5h session (start → end), account %, this machine's % of it, this machine's active time and tokens |
 
 ## API
 
@@ -32,7 +32,7 @@ Without Docker: `node server.cjs` (reads `~/.claude` directly).
 
 - **Account %** and **window times**: from the cache the `usage-context-awareness` hook writes on the host (`$TMPDIR/ck-usage-limits-cache.json`, source `api/oauth/usage` → `five_hour.utilization`, `resets_at`). Window start = `resets_at − 5h`. Sampled every minute into `/data/usage.json`.
 - **This machine's usage**: assistant-message `usage` from `~/.claude/projects/**/*.jsonl`, deduped by message id, priced at API list rates per model and cache tier (API-equivalent $).
-- **This machine's %** (estimate): API-equivalent $ × the lowest %-per-$ seen across windows with ≥5% utilisation, capped at the account %. The rest is shown as *other machines*. It is accurate once this machine has had one window largely to itself; if machines always overlap, it overstates this machine.
+- **This machine's %** (estimate): API-equivalent $ × the lowest %-per-$ seen across windows with ≥5% utilisation, capped at the account %. It is accurate once this machine has had one window largely to itself; if machines always overlap, it overstates this machine.
 
 Requires the `usage-context-awareness` hook on the host; without it the page shows no account %.
 

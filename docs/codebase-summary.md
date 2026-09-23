@@ -22,7 +22,7 @@ $TMPDIR/ck-usage-limits-cache.json > lib/usage-local.cjs (account 5h / 7d %) ─
 | `lib/state.cjs` | Joins Claude's process registry (`sessions/<pid>.json`) with the harness ledger: one row per session grouped by repo, status (busy / stalled / idle), prompts and skill loads over 7 and 14 days, context overhead of the latest session, concerns |
 | `shared/harness-diagnose.cjs` | Concern rules (`diagnose`, `group`); copy of `cc-distribution/hooks/lib/harness-diagnose.cjs` |
 | `lib/usage-local.cjs` | Scans transcripts modified in the last 8 days, dedupes assistant messages by `message.id`, prices `usage` at API list rates → per-minute buckets. Parsed files are cached by size+mtime. Reads the host hook's usage cache |
-| `lib/usage-view.cjs` | Stores the latest account sample per 5h window (keyed by `resets_at` rounded to the minute, kept 8 days). Calibrates %-per-$ as the minimum over windows ≥5%; this machine's % = cost up to the sample × rate, capped at the account % |
+| `lib/usage-view.cjs` | Stores the latest account sample per 5h window (keyed by `resets_at` rounded to the minute, kept 8 days; history only feeds calibration). Calibrates %-per-$ as the minimum over windows ≥5%; this machine's % = cost up to the sample × rate, capped at the account % |
 | `public/` | `index.html`/`app.js`/`charts.js` (sessions), `concerns.*`, `usage.*`; shared tokens and components in `app.css`; theme stored in `localStorage` |
 
 ## Pricing weights (`lib/usage-local.cjs`)
