@@ -1,0 +1,17 @@
+name: cc-harness
+services:
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cc-harness-dashboard:local
+    container_name: cc-harness-dashboard
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4317:4317"
+    environment:
+      HOST_HOME: ${HOME}
+    volumes:
+      - ${HOME}/.claude/sessions:/claude/sessions:ro
+      - ${HOME}/.claude/harness:/claude/harness:ro
+      - ${HOME}/.claude/projects:/claude/projects:ro

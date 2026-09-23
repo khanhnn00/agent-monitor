@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Harness · Claude Code</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%237c5cfc'/%3E%3Cstop offset='1' stop-color='%23f472b6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cpath d='M10 9v14M22 9v14M10 16h12' stroke='%23fdfcff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="top">
+      <div class="brand">
+        <div class="logo">Harness</div>
+        <div class="subtitle">Claude Code on this machine <span id="pulse" class="pulse"><i></i><span id="updated">connecting…</span></span></div>
+      </div>
+      <div class="controls">
+        <div class="seg" role="tablist" aria-label="Scope">
+          <button data-scope="live" class="active" role="tab">Live</button>
+          <button data-scope="all" role="tab">Last 7 days</button>
+        </div>
+        <input id="search" type="search" placeholder="Filter repo, session, prompt, skill…" autocomplete="off" />
+        <a class="icon-btn back" href="/concerns" title="Concerns">Concerns</a>
+        <button id="theme" class="icon-btn" title="Toggle theme" aria-label="Toggle theme"></button>
+      </div>
+    </header>
+
+    <section id="stats" class="stats" aria-label="Totals"></section>
+
+    <section class="charts" aria-label="Activity charts">
+      <div class="card chart-card">
+        <div class="card-head"><h3>Prompts per day</h3><span class="muted small">14 days · by repo</span><button class="link small" data-toggle="table-prompts">Table</button></div>
+        <div id="chart-prompts" class="viz" aria-label="Prompts per day for the last 14 days, stacked by repo"></div>
+        <div id="legend-prompts" class="legend"></div>
+      </div>
+      <div class="card chart-card">
+        <div class="card-head"><h3>Activity by hour</h3><span class="muted small">prompts · 7 days</span><button class="link small" data-toggle="table-hours">Table</button></div>
+        <div id="chart-hours" class="viz" aria-label="Prompts by day and hour for the last 7 days"></div>
+        <div id="legend-hours" class="legend"></div>
+      </div>
+    </section>
+
+    <main class="grid">
+      <section class="col-main">
+        <div class="section-head"><h2>Repos</h2><span id="repo-count" class="muted"></span></div>
+        <div id="repos"><div class="skeleton"></div><div class="skeleton"></div></div>
+      </section>
+      <aside class="col-side">
+        <div class="card">
+          <div class="card-head"><h3>Activity</h3><span class="muted small">latest prompts</span></div>
+          <ol id="activity" class="feed"></ol>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Skills</h3><span class="muted small">loads · 7 days / all</span></div>
+          <div id="skills"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Context paid up front</h3><span id="overhead-src" class="muted small"></span></div>
+          <div id="overhead"></div>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="foot">Harness · cc-distribution · read-only view of ~/.claude · © <span id="year"></span></footer>
+  </div>
+  <script src="/charts.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
