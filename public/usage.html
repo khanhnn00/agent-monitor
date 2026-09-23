@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Usage · Harness</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231f4fb4'/%3E%3Cpath d='M8 23V16M13 23V10M18 23V13M23 23V7' stroke='%23fff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="top">
+      <div class="brand">
+        <div class="logo">Usage</div>
+        <div class="subtitle">5-hour session limit, split by machine <span id="summary" class="pulse"><i></i><span>asking the hub…</span></span></div>
+      </div>
+      <div class="controls">
+        <a class="icon-btn back" href="/">← Dashboard</a>
+        <button id="theme" class="icon-btn" title="Toggle theme" aria-label="Toggle theme"></button>
+      </div>
+    </header>
+    <section id="current" aria-label="Current 5-hour window"><div class="skeleton"></div></section>
+    <section class="card">
+      <div class="card-head"><h3>Past windows</h3><span class="muted small">last 8 days</span></div>
+      <div id="history"></div>
+    </section>
+    <section class="card">
+      <div class="card-head"><h3>Machines</h3><span id="self" class="muted small"></span></div>
+      <div id="machines"></div>
+    </section>
+    <footer class="foot">Machine share = its API-equivalent token cost ÷ all machines' cost in the window · © <span id="year"></span></footer>
+  </div>
+  <script src="/usage.js"></script>
+</body>
+</html>

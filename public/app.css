@@ -333,3 +333,27 @@ h3 { font-family: var(--font-head); font-size: 15px; font-weight: 600; margin: 0
 .finding-card .more > summary::-webkit-details-marker { display: none; }
 .finding-card .more > summary:hover { text-decoration: underline; }
 .finding-card .more[open] > summary { color: var(--text-secondary); }
+
+/* Usage page */
+#current { display: grid; gap: 12px; }
+.u-now { display: grid; gap: 14px; }
+.u-meter { display: flex; height: 10px; border-radius: 999px; background: var(--viz-empty); overflow: hidden; }
+.u-meter.tall { height: 18px; }
+.u-seg { display: block; height: 100%; min-width: 2px; border-right: 1px solid var(--bg-surface); }
+.u-seg:last-child { border-right: 0; }
+.u-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; }
+.u-key { display: inline-flex; align-items: center; gap: 6px; }
+.u-key i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.u-tbl { table-layout: auto; }
+.u-tbl th.num { text-align: right; }
+.u-tbl th:nth-child(n+2), .u-tbl td:nth-child(n+2) { width: auto; }
+.u-self td { background: var(--viz-hover); }
+.u-hist { display: grid; }
+.u-row { display: grid; grid-template-columns: 190px 1fr 48px; gap: 4px 14px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.u-row:last-child { border-bottom: 0; }
+.u-row .u-legend { grid-column: 1 / -1; color: var(--text-secondary); }
+@media (max-width: 640px) {
+  .u-row { grid-template-columns: 1fr 48px; }
+  .u-row .u-bar { grid-column: 1 / -1; grid-row: 2; }
+  .u-tbl { font-size: 12px; }
+}

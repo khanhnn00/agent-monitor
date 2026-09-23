@@ -6,6 +6,7 @@
  *   GET /api/state         Claude sessions per repo: status, intent, subagents, skills, context overhead
  *   GET /api/session/:id   one session's recent turns
  *   GET /api/stream        Server-Sent Events: /api/state, pushed whenever it changes
+ *   GET /api/usage         5h windows: account % and each machine's share (see lib/usage-sync.cjs)
  */
 'use strict';
 const http = require('http');
@@ -13,6 +14,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { buildState, sessionDetail } = require('./lib/state.cjs');
+const usage = require('./lib/usage-sync.cjs');
 
 const PORT = Number(process.env.PORT || 4317);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -50,6 +52,12 @@ http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
   try {
     if (url.pathname === '/api/state') return send(res, 200, snapshot().body, 'application/json');
+    if (url.pathname === '/api/usage') {
+      usage.usageView()
+        .then((v) => send(res, 200, JSON.stringify(v), 'application/json'))
+        .catch((e) => send(res, 502, JSON.stringify({ error: e.message }), 'application/json'));
+      return undefined;
+    }
     if (url.pathname === '/api/stream') {
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
       const s = snapshot();
@@ -64,7 +72,7 @@ http.createServer((req, res) => {
       const detail = sessionDetail(m[1]);
       return send(res, detail ? 200 : 404, JSON.stringify(detail || { error: 'not recorded by the harness' }), 'application/json');
     }
-    const page = url.pathname === '/' ? 'index.html' : url.pathname === '/concerns' ? 'concerns.html' : url.pathname.slice(1);
+    const page = url.pathname === '/' ? 'index.html' : url.pathname === '/concerns' ? 'concerns.html' : url.pathname === '/usage' ? 'usage.html' : url.pathname.slice(1);
     const file = path.resolve(PUBLIC, page);
     if (!file.startsWith(PUBLIC + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) return send(res, 404, 'not found', 'text/plain');
     return send(res, 200, fs.readFileSync(file), TYPES[path.extname(file)] || 'application/octet-stream');
@@ -72,3 +80,5 @@ http.createServer((req, res) => {
     return send(res, 500, JSON.stringify({ error: e.message }), 'application/json');
   }
 }).listen(PORT, HOST, () => console.log(`harness dashboard on http://${HOST}:${PORT} · data ${process.env.CLAUDE_DIR || '~/.claude'}`));
+
+usage.start();
