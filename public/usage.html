@@ -15,7 +15,7 @@
     <header class="top">
       <div class="brand">
         <div class="logo">Usage</div>
-        <div class="subtitle">5-hour session limit, split by machine <span id="summary" class="pulse"><i></i><span>asking the hub…</span></span></div>
+        <div class="subtitle">5-hour session limit · this machine vs the rest of the account <span id="summary" class="pulse"><i></i><span>reading transcripts…</span></span></div>
       </div>
       <div class="controls">
         <a class="icon-btn back" href="/">← Dashboard</a>
@@ -27,11 +27,7 @@
       <div class="card-head"><h3>Past windows</h3><span class="muted small">last 8 days</span></div>
       <div id="history"></div>
     </section>
-    <section class="card">
-      <div class="card-head"><h3>Machines</h3><span id="self" class="muted small"></span></div>
-      <div id="machines"></div>
-    </section>
-    <footer class="foot">Machine share = its API-equivalent token cost ÷ all machines' cost in the window · © <span id="year"></span></footer>
+    <footer class="foot">This machine % = its API-equivalent token cost × the lowest %-per-$ seen across windows, capped at the account % · © <span id="year"></span></footer>
   </div>
   <script src="/usage.js"></script>
 </body>

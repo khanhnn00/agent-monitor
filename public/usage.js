@@ -8,39 +8,43 @@ const hm = (t) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: 
 const day = (t) => new Date(t).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
 const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m}m ago` : `${Math.floor(m / 60)}h ${m % 60}m ago`; };
 const left = (t) => { const m = Math.max(0, Math.round((t - Date.now()) / 60000)); return `${Math.floor(m / 60)}h ${m % 60}m`; };
-const SERIES = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)'];
-let colors = {};
+const MINE = 'var(--series-1)';
+const OTHERS = 'var(--series-other)';
+const est = (w) => w.minePercent != null;
 
-/** Account bar: each machine's slice of the used %, the rest of 100% left empty. */
+/** Account bar: this machine's slice, then everyone else's, the rest of 100% left empty. */
 function meter(w, tall) {
-  const segs = w.machines.map((m) => `<span class="u-seg" style="width:${m.percent}%;background:${colors[m.machine] || 'var(--series-other)'}" title="${esc(m.machine)} · ${pct(m.percent)}"></span>`).join('');
+  const segs = est(w)
+    ? `<span class="u-seg" style="width:${w.minePercent}%;background:${MINE}" title="This machine · ${pct(w.minePercent)}"></span>${w.othersPercent < 0.05 ? "" : `<span class="u-seg" style="width:${w.othersPercent}%;background:${OTHERS}" title="Other machines · ${pct(w.othersPercent)}"></span>`}`
+    : `<span class="u-seg" style="width:${w.utilization}%;background:${OTHERS}"></span>`;
   return `<div class="u-meter${tall ? ' tall' : ''}" role="img" aria-label="${pct(w.utilization)} of the 5-hour limit used">${segs}</div>`;
 }
 
-const legend = (w) => w.machines.map((m) => `<span class="u-key"><i style="background:${colors[m.machine]}"></i>${esc(m.machine)} <b>${pct(m.percent)}</b></span>`).join('');
+const legend = (w) => (est(w)
+  ? `<span class="u-key"><i style="background:${MINE}"></i>This machine <b>${pct(w.minePercent)}</b></span><span class="u-key"><i style="background:${OTHERS}"></i>Other machines <b>${pct(w.othersPercent)}</b></span>`
+  : '<span class="muted">Not calibrated yet — needs one window at ≥5% with activity here.</span>');
 
 function current(v) {
   const w = v.windows.find((x) => x.current);
-  if (!w) return `<div class="card empty big">No sample for the current 5-hour window yet — it appears once any machine sends a prompt.</div>`;
-  const self = v.self && v.self.machine;
-  const rows = w.machines.map((m) => `<tr${m.machine === self ? ' class="u-self"' : ''}>
-    <td><span class="u-key"><i style="background:${colors[m.machine]}"></i>${esc(m.machine)}</span>${m.machine === self ? ' <span class="chip soft">this machine</span>' : ''}</td>
-    <td class="num"><b>${pct(m.percent)}</b></td>
-    <td class="num">${pct(m.share * 100)}</td>
-    <td class="num">${m.messages}</td>
-    <td class="num mono">${k(m.input + m.cacheWrite + m.cacheRead)} / ${k(m.output)}</td>
-    <td class="num mono">${hm(m.first)}–${hm(m.last + 60000)}</td>
-  </tr>`).join('');
+  if (!w) return '<div class="card empty big">No sample for the current 5-hour window yet — it appears after the next prompt on this machine.</div>';
+  const m = w.mine;
   const weekly = v.weekly ? `<div class="stat"><div class="stat-label">Weekly · account</div><div class="stat-value">${pct(v.weekly.utilization)}</div><div class="stat-sub">resets ${day(v.weekly.resetsAt)} ${hm(v.weekly.resetsAt)}</div></div>` : '';
   return `<div class="stats">
       <div class="stat hi"><div class="stat-label">Current session</div><div class="stat-value">${hm(w.start)} → ${hm(w.end)}</div><div class="stat-sub">${day(w.start)} · resets in ${left(w.end)}</div></div>
-      <div class="stat"><div class="stat-label">Account used</div><div class="stat-value">${pct(w.utilization)}</div><div class="stat-sub">sampled ${ago(w.sampledAt)} by ${esc(w.sampledBy)}</div></div>
+      <div class="stat"><div class="stat-label">Account used</div><div class="stat-value">${pct(w.utilization)}</div><div class="stat-sub">sampled ${ago(w.sampledAt)}</div></div>
+      <div class="stat"><div class="stat-label">This machine</div><div class="stat-value">${est(w) ? pct(w.minePercent) : '—'}</div><div class="stat-sub">${est(w) ? `others ${pct(w.othersPercent)}` : 'not calibrated yet'}</div></div>
       ${weekly}
     </div>
     <div class="card u-now">
       ${meter(w, true)}
-      <div class="u-legend">${legend(w) || '<span class="muted">No machine has reported activity in this window.</span>'}</div>
-      ${rows ? `<table class="tbl u-tbl"><thead><tr><th>Machine</th><th class="num">Of limit</th><th class="num">Share</th><th class="num">Msgs</th><th class="num">In / out tok</th><th class="num">Active</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
+      <div class="u-legend">${legend(w)}</div>
+      <table class="tbl u-tbl"><thead><tr><th>This machine</th><th class="num">Msgs</th><th class="num">In / out tok</th><th class="num">API-equiv.</th><th class="num">Active</th></tr></thead><tbody><tr>
+        <td>${m.messages ? 'Claude Code on this machine' : '<span class="muted">No activity here this window</span>'}</td>
+        <td class="num">${m.messages}</td>
+        <td class="num mono">${k(m.input + m.cacheWrite + m.cacheRead)} / ${k(m.output)}</td>
+        <td class="num mono">$${m.cost.toFixed(2)}</td>
+        <td class="num mono">${m.first ? `${hm(m.first)}–${hm(m.last + 60000)}` : '—'}</td>
+      </tr></tbody></table>
     </div>`;
 }
 
@@ -55,22 +59,11 @@ function history(v) {
   </div>`).join('')}</div>`;
 }
 
-function machines(v) {
-  return `<table class="tbl u-tbl"><thead><tr><th>Machine</th><th>Last report</th></tr></thead><tbody>${v.machines.map((m) => `<tr>
-    <td><span class="u-key"><i style="background:${colors[m.name]}"></i>${esc(m.name)}</span></td>
-    <td><span class="pill${Date.now() - m.lastSeen < 5 * 60000 ? ' live' : ''}">${ago(m.lastSeen)}</span></td>
-  </tr>`).join('')}</tbody></table>`;
-}
-
 function render(v) {
-  colors = {};
-  v.machines.forEach((m, i) => { colors[m.name] = SERIES[i] || 'var(--series-other)'; });
-  const s = v.self || {};
-  $('#summary').innerHTML = `<i></i><span>${v.machines.length} ${v.machines.length === 1 ? 'machine' : 'machines'} reporting</span>`;
+  const c = v.calibration;
+  $('#summary').innerHTML = `<i></i><span>${c ? `${c.percentPerDollar.toFixed(2)}% per $ · from ${day(c.fromWindowEnd - 5 * 3600000)} ${hm(c.fromWindowEnd - 5 * 3600000)}` : 'not calibrated yet'}</span>`;
   $('#current').innerHTML = current(v);
   $('#history').innerHTML = history(v);
-  $('#machines').innerHTML = machines(v);
-  $('#self').textContent = `this is ${s.machine} · ${s.hubUrl ? `reports to ${s.hubUrl}` : 'hub'}${s.lastError ? ` · last report failed: ${s.lastError}` : ''}`;
 }
 
 async function load() {

@@ -6,7 +6,7 @@ COPY public ./public
 COPY shared ./shared
 RUN mkdir -p /data && chown node:node /data
 ENV NODE_ENV=production PORT=4317 HOST=0.0.0.0 CLAUDE_DIR=/claude
-EXPOSE 4317 4318
+EXPOSE 4317
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:4317/api/state > /dev/null || exit 1
 USER node
 CMD ["node", "server.cjs"]
