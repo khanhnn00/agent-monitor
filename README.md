@@ -1,6 +1,6 @@
 # agent-monitor
 
-Local, read-only dashboard over `~/.claude` for Claude Code: live sessions per repo, harness concerns, and this machine's share of the account's 5-hour usage limit. Zero dependencies (Node 22, `http` + `fs`), runs in Docker on `127.0.0.1:4317`. Nothing leaves the machine.
+Local, read-only monitor for Claude Code over `~/.claude`: live sessions per repo, activity, skills, context overhead, harness concerns, and this machine's share of the account's 5-hour usage limit. Zero dependencies (Node 22, `http` + `fs`), runs in Docker on `127.0.0.1:4317`. Nothing leaves the machine.
 
 ## Run
 
@@ -11,30 +11,75 @@ open http://127.0.0.1:4317
 
 Without Docker: `node server.cjs` (reads `~/.claude` directly).
 
-## Pages
+## Features
 
-| Path | Shows |
+### Dashboard — `/`
+
+Updates live over Server-Sent Events. **Live / Last 7 days** switch and a filter box (repo, session, prompt, skill) apply to every panel.
+
+- **Totals**: live sessions (working · stalled · process count), repos live / active in 7 days, subagents running now, prompts today with a 7-day sparkline, skill loads in 7 days and the top skill, delivery reviews (awaiting approval · unapproved changes · contract updates), context paid per session.
+- **Charts**: prompts per day for 14 days stacked by repo, and a day × hour activity heatmap for 7 days; each has a table view.
+- **Repos**: one card per repo with working / stalled / live / subagent badges, prompts in 7 days and top skills. Each session row shows:
+  - status: working, idle, stalled (busy with no activity for 60 min) or ended; pid and older processes still attached
+  - session kind, model, git branch, last activity
+  - the latest real prompt (intent), session title, prompt count
+  - approval-gate chips: awaiting your approval, unapproved changes, review and check counts
+  - context size per prompt as a sparkline, highlighted above 150k tokens
+  - running subagents with type and description; skills loaded in the last 30 prompts
+  - expandable timeline of the last 25 turns: number, time, model, context start → peak, prompt, skills (how loaded, size), subagents, outcome
+- **Activity**: the latest 25 prompts across repos with their skills and subagents.
+- **Skills**: loads per skill over 7 days and all time.
+- **Context paid up front**: tokens spent on instructions (CLAUDE.md + rules), skill listing, agent listing, tool listing and prompt hooks; plus listed skills that were never loaded.
+
+### Concerns — `/concerns`
+
+Findings from the last 14 days, grouped by rule, with severity, the repos/sessions affected, estimated tokens per week and how-to-fix steps; filterable.
+
+| Rule | Flags when |
 |---|---|
-| `/` | Claude sessions per repo: status, intent, subagents, skills, context overhead, activity charts |
-| `/concerns` | What the harness wastes (hook/skill token cost per week), with fixes |
-| `/usage` | Current 5h session (start → end), account %, this machine's % of it, this machine's active time and tokens |
+| Context never cleared | 5+ prompts in a session start above the context limit and it was never compacted |
+| Hook text is the largest recurring cost | Hooks injected 50k+ characters into a repo's prompts |
+| Most listed skills are never loaded | More than half of the listed skills were not loaded in the period |
+| Tool calls fail often | 5+ prompts, and at least 20% of a repo's prompts, hit tool errors |
+| Files rewritten across many prompts | A file was touched in 3+ separate prompts |
+| Sessions left running for days | A live session has been idle for 7+ days |
+
+### Usage — `/usage`
+
+The current 5-hour session and how much of it this machine used:
+
+- session start → end and time to reset
+- account usage % for the session
+- this machine's % of the session limit, and its share of the account's usage
+- this machine's active time, message count, input/output tokens and API-equivalent cost
+
+How the numbers are made:
+
+- **Account %** and **session times**: from the cache the `usage-context-awareness` hook writes on the host (`$TMPDIR/ck-usage-limits-cache.json`, source `api/oauth/usage` → `five_hour.utilization`, `resets_at`). Start = `resets_at − 5h`. Sampled every minute into `/data/usage.json`.
+- **This machine's tokens**: assistant-message `usage` from `~/.claude/projects/**/*.jsonl`, deduped by message id, priced at API list rates per model and cache tier.
+- **This machine's %** (estimate): API-equivalent $ × the lowest %-per-$ seen across sessions with ≥5% utilisation, capped at the account %. Accurate once this machine has had one session largely to itself; if machines always overlap, it overstates this machine.
+
+## Data sources
+
+| Path | Written by | Feeds |
+|---|---|---|
+| `~/.claude/sessions/<pid>.json` | Claude Code | live sessions, status, pids |
+| `~/.claude/projects/**/*.jsonl` | Claude Code | subagents, usage tokens |
+| `~/.claude/harness/sessions/<id>.json` | cc-distribution harness hooks | turns, prompts, skills, context, hooks, concerns |
+| `~/.claude/harness/skill-stats.json` | cc-distribution harness hooks | skill loads all time |
+| `~/.claude/harness/gate/<id>.json` | cc-distribution approval gate | review / approval chips |
+| `$TMPDIR/ck-usage-limits-cache.json` | `usage-context-awareness` hook | account usage % |
+
+Without the cc-distribution hooks, only live sessions, subagents and token usage are shown.
 
 ## API
 
 | Endpoint | Returns |
 |---|---|
-| `GET /api/state` | Sessions per repo + concerns |
-| `GET /api/session/:id` | One session's recent turns |
+| `GET /api/state` | Totals, repos and sessions, activity, skills, overhead, concerns |
+| `GET /api/session/:id` | One session's last 25 turns |
 | `GET /api/stream` | SSE push of `/api/state` on change |
-| `GET /api/usage` | 5h windows with account %, this machine's % and token/cost totals |
-
-## Usage page — how the numbers are made
-
-- **Account %** and **window times**: from the cache the `usage-context-awareness` hook writes on the host (`$TMPDIR/ck-usage-limits-cache.json`, source `api/oauth/usage` → `five_hour.utilization`, `resets_at`). Window start = `resets_at − 5h`. Sampled every minute into `/data/usage.json`.
-- **This machine's usage**: assistant-message `usage` from `~/.claude/projects/**/*.jsonl`, deduped by message id, priced at API list rates per model and cache tier (API-equivalent $).
-- **This machine's %** (estimate): API-equivalent $ × the lowest %-per-$ seen across windows with ≥5% utilisation, capped at the account %. It is accurate once this machine has had one window largely to itself; if machines always overlap, it overstates this machine.
-
-Requires the `usage-context-awareness` hook on the host; without it the page shows no account %.
+| `GET /api/usage` | 5h sessions with account %, this machine's % and token/cost totals |
 
 ## Configuration
 
@@ -50,9 +95,9 @@ Requires the `usage-context-awareness` hook on the host; without it the page sho
 
 ```
 server.cjs              HTTP server, routes, SSE, per-minute usage sampling
-lib/state.cjs           sessions, subagents, skills, concerns from ~/.claude
+lib/state.cjs           sessions, subagents, skills, overhead, concerns from ~/.claude
 lib/usage-local.cjs     transcript scan → per-minute cost buckets; account cache reader
-lib/usage-view.cjs      window store, calibration, /api/usage payload
+lib/usage-view.cjs      session store, calibration, /api/usage payload
 shared/harness-diagnose.cjs   concern rules (copy of cc-distribution hooks/lib/harness-diagnose.cjs)
-public/                 index / concerns / usage pages, app.css
+public/                 index / concerns / usage pages, charts.js, app.css
 ```
