@@ -116,7 +116,7 @@ async function loadDetail(id) {
   ui.loading.add(id);
   try {
     const r = await fetch(`/api/session/${encodeURIComponent(id)}`);
-    ui.details.set(id, r.ok ? { ...(await r.json()), fetchedAt: Date.now() } : { error: 'This session is not recorded by the harness yet.', fetchedAt: Date.now() });
+    ui.details.set(id, r.ok ? { ...(await r.json()), fetchedAt: Date.now() } : { error: 'No turns recorded for this session yet.', fetchedAt: Date.now() });
   } catch (err) {
     ui.details.set(id, { error: String(err.message || err), fetchedAt: Date.now() });
   } finally {

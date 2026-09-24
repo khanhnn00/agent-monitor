@@ -67,7 +67,7 @@ http.createServer((req, res) => {
     const m = url.pathname.match(/^\/api\/session\/([\w-]{8,64})$/);
     if (m) {
       const detail = sessionDetail(m[1]);
-      return send(res, detail ? 200 : 404, JSON.stringify(detail || { error: 'not recorded by the harness' }), 'application/json');
+      return send(res, detail ? 200 : 404, JSON.stringify(detail || { error: 'no turns recorded for this session' }), 'application/json');
     }
     const page = url.pathname === '/' ? 'index.html' : url.pathname === '/concerns' ? 'concerns.html' : url.pathname === '/usage' ? 'usage.html' : url.pathname.slice(1);
     const file = path.resolve(PUBLIC, page);
