@@ -98,6 +98,18 @@ How the numbers are made:
 
 Without the cc-distribution hooks, only live sessions, subagents and token usage are shown.
 
+### Ledger hooks (without cc-distribution)
+
+`hooks/ledger.cjs` is a minimal, dependency-free hook that writes `harness/sessions/<id>.json` and `harness/skill-stats.json` in the same shape, so prompts, activity, skills, the session timeline and the context / tool-error / rework concerns fill in. It runs on `SessionStart`, `UserPromptSubmit` and `Stop` (~80 ms each), reads the turn back from the transcript on `Stop`, prints nothing and always exits 0. It does not produce the context-overhead listing, hook costs or approval-gate chips.
+
+```bash
+node hooks/install.cjs --dry-run    # show the hooks block it would add
+node hooks/install.cjs              # add it to ~/.claude/settings.json (backs the file up first)
+node hooks/install.cjs --uninstall  # remove it
+```
+
+The hook command points at this checkout, so keep the repo where it is (or re-run the installer after moving it). Sessions started after installing are recorded; restart open ones.
+
 ## API
 
 | Endpoint | Returns |
@@ -125,5 +137,6 @@ lib/state.cjs           sessions, subagents, skills, overhead, concerns from ~/.
 lib/usage-local.cjs     transcript scan → per-minute cost buckets; account cache reader
 lib/usage-view.cjs      session store, calibration, /api/usage payload
 shared/harness-diagnose.cjs   concern rules (copy of cc-distribution hooks/lib/harness-diagnose.cjs)
+hooks/ledger.cjs        optional minimal hook writing the harness ledger; hooks/install.cjs registers it
 public/                 index / concerns / usage pages, charts.js, app.css
 ```

@@ -10,6 +10,7 @@ Local read-only dashboard over `~/.claude`: Claude Code sessions per repo, harne
 4. `lib/usage-view.cjs` — 5h window store (`DATA_DIR/usage.json`), calibration, `/api/usage`
 5. `shared/harness-diagnose.cjs` — concern rules used by `state.cjs`
 6. `public/` — `index`, `concerns`, `usage` pages; shared `app.css` tokens
+7. `hooks/` — optional minimal ledger writer (`ledger.cjs`) and its settings.json installer; must stay silent and exit 0
 
 ## Build & Test
 
