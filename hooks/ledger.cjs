@@ -8,8 +8,10 @@
  *   Stop               close the turn from the transcript since that offset: model, context start/peak,
  *                      skills, subagents, files edited, commands, tool errors, outcome; bump skill-stats.json
  *
+ *                      and the up-front listing (instructions, skills, agents, deferred tools) from the transcript
+ *
  * Works on macOS, Linux and Windows. Never blocks Claude: prints nothing and always exits 0.
- * Does not fill `listing`, `hooks` or the approval gate (cc-distribution only).
+ * Does not fill `hooks` or the approval gate (cc-distribution only).
  */
 'use strict';
 const fs = require('fs');
@@ -113,6 +115,70 @@ function readTurn(p, offset) {
   return out;
 }
 
+const INSTR_RE = /Contents of ([^\n]+?) \([^\n]*\):\n+([\s\S]*?)(?=\n+Contents of |<\/system-reminder>|$)/g;
+
+/**
+ * What the session pays for up front, from the listing attachments Claude Code writes into the transcript.
+ * Scans only what was appended since the last Stop; listings arrive as an initial set plus deltas.
+ */
+function updateListing(s) {
+  const size = transcriptSize(s.transcript);
+  const from = s.listingOffset && s.listingOffset <= size ? s.listingOffset : 0;
+  if (size <= from) return;
+  let text = '';
+  try {
+    const fd = fs.openSync(s.transcript, 'r');
+    const buf = Buffer.alloc(size - from);
+    fs.readSync(fd, buf, 0, buf.length, from);
+    fs.closeSync(fd);
+    text = buf.toString('utf8');
+  } catch (_) { return; }
+  const L = s.listing || {};
+  const instr = { ...(L.instr || {}) };
+  let agents = { ...(L.agents || {}) };
+  const tools = { ...(L.tools || {}) };
+  let skillChars = L.skillChars || 0;
+  let names = L.names || [];
+  const lastNl = text.lastIndexOf('\n');
+  if (lastNl < 0) return; // the last line is still being written
+  for (const line of text.slice(0, lastNl).split('\n')) {
+    if (!line.includes('"attachment"') && !line.includes('Contents of ')) continue;
+    let r;
+    try { r = JSON.parse(line); } catch (_) { continue; }
+    const a = r.attachment;
+    if (a && a.type === 'skill_listing') {
+      if (a.isInitial || !skillChars) { skillChars = 0; names = []; }
+      skillChars += String(a.content || '').length;
+      names = [...new Set([...names, ...(a.names || [])])];
+    } else if (a && a.type === 'agent_listing_delta') {
+      if (a.isInitial) agents = {};
+      for (const t of a.removedTypes || []) delete agents[t];
+      (a.addedTypes || []).forEach((t, i) => { agents[t] = String((a.addedLines || [])[i] || t).length; });
+    } else if (a && a.type === 'deferred_tools_delta') {
+      for (const t of a.removedNames || []) delete tools[t];
+      (a.addedNames || []).forEach((t, i) => { tools[t] = String((a.addedLines || [])[i] || t).length; });
+    } else if (a && a.type === 'nested_memory' && a.content) {
+      instr[a.path || a.displayPath] = String(a.content.content || '').length;
+    } else if (r.type === 'user' && r.message) {
+      // CLAUDE.md and rules arrive as "Contents of <path> (...):" sections in a meta user message.
+      const c = r.message.content;
+      for (const b of typeof c === 'string' ? [{ type: 'text', text: c }] : Array.isArray(c) ? c : []) {
+        if (b.type !== 'text' || !b.text || !b.text.includes('Contents of ')) continue;
+        for (const m of b.text.matchAll(INSTR_RE)) instr[m[1]] = m[2].trim().length;
+      }
+    }
+  }
+  const sum = (o) => Object.values(o).reduce((x, y) => x + y, 0);
+  s.listing = {
+    instructionChars: sum(instr), skillChars, skills: names.length, names,
+    agentChars: sum(agents), toolChars: sum(tools), instr, agents, tools,
+  };
+  s.listingOffset = from + Buffer.byteLength(text.slice(0, lastNl + 1), 'utf8');
+}
+
+/** Prompts carry harness <system-reminder> blocks ahead of what the user typed. */
+const userText = (p) => String(p || '').replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '').trim();
+
 function bumpSkills(skills, repo) {
   if (!skills.length) return;
   const st = readJson(STATS, null) || { since: now(), skills: {} };
@@ -134,7 +200,7 @@ function handle(input) {
   if (event === 'SessionStart') {
     if (input.source === 'compact') s.compactions.push(now());
   } else if (event === 'UserPromptSubmit') {
-    const t = { n: s.turns.length ? s.turns[s.turns.length - 1].n + 1 : 1, start: now(), end: null, prompt: clip(input.prompt, 2000), model: null, outcome: '', skills: [], agents: [], files: [], commands: [], errors: 0, ctxStart: 0, ctxPeak: 0, offset: transcriptSize(s.transcript) };
+    const t = { n: s.turns.length ? s.turns[s.turns.length - 1].n + 1 : 1, start: now(), end: null, prompt: clip(userText(input.prompt) || input.prompt, 2000), model: null, outcome: '', skills: [], agents: [], files: [], commands: [], errors: 0, ctxStart: 0, ctxPeak: 0, offset: transcriptSize(s.transcript) };
     s.turns.push(t);
     s.live = { prompt: t.prompt, since: t.start };
   } else if (event === 'Stop') {
@@ -144,6 +210,7 @@ function handle(input) {
       delete t.offset;
       bumpSkills(t.skills, path.basename(s.repo));
     }
+    updateListing(s);
     s.live = null;
   } else {
     return;
