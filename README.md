@@ -41,7 +41,7 @@ Docker Desktop on Windows runs a Linux VM (WSL2 or Hyper-V) and has not been tes
 
 ### Dashboard — `/`
 
-Updates live over Server-Sent Events. **Live / Last 7 days** switch and a filter box (repo, session, prompt, skill) apply to every panel.
+Updates live over Server-Sent Events. **Live / Last 7 days** switch and a filter box (repo, session, prompt, skill, subagent type, branch) apply to every panel. The filter ignores case and accents (`chay` finds `chạy`); charts and the prompt count narrow to matching prompts, and a session matches on any of its prompts from the last 14 days.
 
 - **Totals**: live sessions (working · stalled · process count), repos live / active in 7 days, subagents running now, prompts today with a 7-day sparkline, skill loads in 7 days and the top skill, delivery reviews (awaiting approval · unapproved changes · contract updates), context paid per session.
 - **Charts**: prompts per day for 14 days stacked by repo, and a day × hour activity heatmap for 7 days; each has a table view.
@@ -84,6 +84,7 @@ How the numbers are made:
 - **Account %** and **session times**: from the cache the `usage-context-awareness` hook writes on the host (`$TMPDIR/ck-usage-limits-cache.json`, source `api/oauth/usage` → `five_hour.utilization`, `resets_at`). Start = `resets_at − 5h`. Sampled every minute into `/data/usage.json`.
 - **This machine's tokens**: assistant-message `usage` from `~/.claude/projects/**/*.jsonl`, deduped by message id, priced at API list rates per model and cache tier.
 - **This machine's %** (estimate): API-equivalent $ × the lowest %-per-$ seen across sessions with ≥5% utilisation, capped at the account %. Accurate once this machine has had one session largely to itself; if machines always overlap, it overstates this machine.
+- **Without the cache** (e.g. Windows without cc-distribution): sessions are rebuilt from this machine's own messages — a session starts at the hour of the first message after the previous one ended. Account % shows `—`; tokens and API-equivalent cost are still shown.
 
 ## Data sources
 
@@ -100,7 +101,7 @@ Without the cc-distribution hooks, only live sessions, subagents and token usage
 
 ### Ledger hooks (without cc-distribution)
 
-`hooks/ledger.cjs` is a minimal, dependency-free hook that writes `harness/sessions/<id>.json` and `harness/skill-stats.json` in the same shape, so prompts, activity, skills, the session timeline and the context / tool-error / rework concerns fill in. It runs on `SessionStart`, `UserPromptSubmit` and `Stop` (~80 ms each), reads the turn back from the transcript on `Stop`, prints nothing and always exits 0. It does not produce the context-overhead listing, hook costs or approval-gate chips.
+`hooks/ledger.cjs` is a minimal, dependency-free hook that writes `harness/sessions/<id>.json` and `harness/skill-stats.json` in the same shape, so prompts, activity, skills, the session timeline and the context / tool-error / rework concerns fill in. It runs on `SessionStart`, `UserPromptSubmit` and `Stop` (~80 ms each), reads the turn back from the transcript on `Stop`, prints nothing and always exits 0. On `Stop` it also fills the context-overhead listing (CLAUDE.md, skill, agent and deferred-tool listings) from the transcript's listing attachments, and strips `<system-reminder>` blocks from recorded prompts. It does not produce hook costs or approval-gate chips.
 
 ```bash
 node hooks/install.cjs --dry-run    # show the hooks block it would add

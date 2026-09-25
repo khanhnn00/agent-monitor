@@ -2,7 +2,7 @@
 const $ = (sel) => document.querySelector(sel);
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ESC[c]);
-const ui = { scope: 'live', q: '', open: new Set(), details: new Map(), loading: new Set(), allSkills: false, neverOpen: false, tables: {}, state: null, changedAt: 0, connected: false };
+const ui = { scope: 'live', q: '', open: new Set(), details: new Map(), loading: new Set(), allSkills: false, hitIds: new Set(), neverOpen: false, tables: {}, state: null, changedAt: 0, connected: false };
 
 const DAY = 86400000;
 function ago(value) {
@@ -19,8 +19,11 @@ const k = (n) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n || 0));
 const tok = (chars) => `~${((chars || 0) / 4000).toFixed(1)}k tok`;
 const modelShort = (m) => String(m || '').replace(/^claude-/, '').replace(/-\d{8}$/, '');
 const tier = (m) => (/opus/.test(m) ? 'opus' : /sonnet/.test(m) ? 'sonnet' : /haiku/.test(m) ? 'haiku' : /fable/.test(m) ? 'fable' : 'other');
-const matches = (...fields) => !ui.q || fields.some((f) => String(f || '').toLowerCase().includes(ui.q));
+// Case- and accent-insensitive, so "chay" finds "chạy".
+const fold = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+const matches = (...fields) => !ui.q || fields.some((f) => fold(f).includes(ui.q));
 const chip = (text, cls = '') => `<span class="chip ${cls}">${text}</span>`;
+const logHit = (p) => matches(p.repo, p.session, p.prompt, ...(p.skills || []), ...(p.agents || []));
 
 function spark(times) {
   const start = new Date().setHours(0, 0, 0, 0);
@@ -30,14 +33,16 @@ function spark(times) {
 }
 
 function renderStats(st) {
-  const sp = spark(st.promptTimes);
+  const weekAgo = Date.now() - 7 * DAY;
+  const times = ui.q ? st.promptLog.filter((p) => logHit(p) && Date.parse(p.at) >= weekAgo).map((p) => p.at) : st.promptTimes;
+  const sp = spark(times);
   const top = st.skills.find((x) => x.week);
   const o = st.overhead;
   const cards = [
     { label: 'Live sessions', value: st.totals.live, sub: `${st.totals.busy} working${st.totals.stalled ? ` · ${st.totals.stalled} stalled` : ''} · ${st.totals.processes} processes`, hi: st.totals.busy > 0 },
     { label: 'Repos', value: st.totals.liveRepos, sub: `${st.totals.activeRepos} active in 7 days` },
     { label: 'Subagents', value: st.totals.subagentsRunning, sub: 'running now · active < 90s' },
-    { label: 'Prompts today', value: sp.today, sub: `${st.promptTimes.length} in 7 days`, extra: sp.html },
+    { label: 'Prompts today', value: sp.today, sub: `${times.length} in 7 days${ui.q ? ' · filtered' : ''}`, extra: sp.html },
     { label: 'Skill loads · 7d', value: st.totals.skillLoads7d, sub: top ? `top: ${top.name}` : 'none yet' },
     { label: 'Delivery reviews', value: st.totals.reviews, sub: `${st.totals.awaiting} awaiting approval · ${st.totals.unapproved} unapproved changes · ${st.totals.contractUpdates} contract updates` },
     o && { label: 'Paid per session', value: tok(o.instructions + o.skillListing + o.agentListing + o.toolListing), sub: `${o.skillsListed} skills listed · ${o.neverLoaded.length} never loaded` },
@@ -81,7 +86,8 @@ function sessionRow(v) {
 
 function repoCard(r) {
   const sessions = r.sessions.filter((v) => (ui.scope === 'all' || v.live)
-    && matches(r.name, r.path, v.name, v.intent, v.title, ...v.skills.map((s) => s.name)));
+    && (matches(r.name, r.path, v.name, v.intent, v.title, v.branch, ...v.skills.map((s) => s.name), ...v.subagents.map((a) => a.type))
+      || ui.hitIds.has(v.id)));
   if (!sessions.length) return '';
   return `<article class="repo">
     <header class="repo-head">
@@ -126,7 +132,7 @@ async function loadDetail(id) {
 }
 
 function renderActivity(st) {
-  const items = st.activity.filter((a) => (ui.scope === 'all' || a.live) && matches(a.repo, a.session, a.prompt, ...a.skills)).slice(0, 25);
+  const items = st.activity.filter((a) => (ui.scope === 'all' || a.live) && matches(a.repo, a.session, a.prompt, ...a.skills, ...a.agents)).slice(0, 25);
   $('#activity').innerHTML = items.map((a) => `<li>
     <div class="feed-head"><span class="mono muted">${day(a.at)} ${clock(a.at)}</span><span class="feed-src">${esc(a.repo)} <span class="muted">· ${esc(a.session)}</span></span></div>
     <div class="feed-prompt">${esc(a.prompt)}</div>
@@ -172,27 +178,30 @@ function renderCharts(st) {
   const midnight = new Date().setHours(0, 0, 0, 0);
   const bucket = (iso, span) => Math.floor((new Date(iso).setHours(0, 0, 0, 0) - (midnight - (span - 1) * DAY)) / DAY);
   // Top four repos keep slots 1-4; everything else folds into Other (silver).
+  // Slots come from the unfiltered log so a repo keeps its color while the filter narrows the counts.
+  const log = ui.q ? st.promptLog.filter(logHit) : st.promptLog;
   const totals = {};
   for (const p of st.promptLog) totals[p.repo] = (totals[p.repo] || 0) + 1;
   const top = Object.entries(totals).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 4).map(([r]) => r);
   const keys = Object.keys(totals).length > top.length ? [...top, 'Other'] : [...top];
-  const series = keys.map((key, i) => ({ key, color: key === 'Other' ? 'var(--series-other)' : `var(--series-${i + 1})`, values: Array(14).fill(0) }));
-  for (const p of st.promptLog) {
+  const all = keys.map((key, i) => ({ key, color: key === 'Other' ? 'var(--series-other)' : `var(--series-${i + 1})`, values: Array(14).fill(0) }));
+  for (const p of log) {
     const d = bucket(p.at, 14);
-    if (d < 0 || d > 13 || !series.length) continue;
+    if (d < 0 || d > 13 || !all.length) continue;
     const idx = top.indexOf(p.repo);
-    series[idx >= 0 ? idx : series.length - 1].values[d]++;
+    all[idx >= 0 ? idx : all.length - 1].values[d]++;
   }
+  const series = ui.q ? all.filter((s) => s.values.some(Boolean)) : all;
   const days = Array.from({ length: 14 }, (_, i) => new Date(midnight - (13 - i) * DAY));
   if (ui.tables['table-prompts']) {
     $('#chart-prompts').innerHTML = `<div class="viz-table"><table><thead><tr><th>Day</th>${series.map((s) => `<th>${esc(s.key)}</th>`).join('')}<th>Total</th></tr></thead><tbody>${days.map((d, i) => `<tr><td>${day(d)}</td>${series.map((s) => `<td>${s.values[i] || '—'}</td>`).join('')}<td>${series.reduce((a, s) => a + s.values[i], 0)}</td></tr>`).reverse().join('')}</tbody></table></div>`;
   } else {
     Charts.stackedColumns($('#chart-prompts'), { days, series });
   }
-  $('#legend-prompts').innerHTML = series.map((s) => `<span class="key"><i style="background:${s.color}"></i>${esc(s.key)}</span>`).join('') || '<span class="muted small">no prompts recorded</span>';
+  $('#legend-prompts').innerHTML = series.map((s) => `<span class="key"><i style="background:${s.color}"></i>${esc(s.key)}</span>`).join('') || `<span class="muted small">${ui.q ? 'no prompts match the filter' : 'no prompts recorded'}</span>`;
 
   const hours = Array.from({ length: 7 }, (_, i) => ({ date: new Date(midnight - (6 - i) * DAY), counts: Array(24).fill(0) }));
-  for (const p of st.promptLog) {
+  for (const p of log) {
     const d = bucket(p.at, 7);
     if (d >= 0 && d < 7) hours[d].counts[new Date(p.at).getHours()]++;
   }
@@ -208,6 +217,8 @@ function renderCharts(st) {
 function render() {
   const st = ui.state;
   if (!st) return;
+  // Sessions with any prompt in the last 14 days that matches, not only their latest one.
+  ui.hitIds = new Set(ui.q ? st.promptLog.filter(logHit).map((p) => p.id) : []);
   renderStats(st);
   renderCharts(st);
   const cards = st.repos.map(repoCard).filter(Boolean);
@@ -261,7 +272,7 @@ document.addEventListener('click', (e) => {
   if (!head || String(window.getSelection())) return;
   toggleOpen(head.closest('.proc').dataset.id);
 });
-$('#search').addEventListener('input', (e) => { ui.q = e.target.value.trim().toLowerCase(); render(); });
+$('#search').addEventListener('input', (e) => { ui.q = fold(e.target.value.trim()); render(); });
 
 function connect() {
   const es = new EventSource('/api/stream');
