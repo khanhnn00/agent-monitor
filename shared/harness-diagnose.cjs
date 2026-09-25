@@ -20,7 +20,7 @@ function collect(sessions, since) {
   for (const s of sessions) {
     const turns = (s.turns || []).filter((t) => t.start && t.start >= since);
     if (!turns.length) continue;
-    const name = (s.repo || s.cwd || '?').split('/').filter(Boolean).pop() || '?';
+    const name = (s.repo || s.cwd || '?').split(/[\\/]/).filter(Boolean).pop() || '?';
     const r = repos.get(name) || { name, sessions: [], turns: [], files: {}, hooks: {} };
     for (const [hook, h] of Object.entries(s.hooks || {})) {
       const agg = (r.hooks[hook] = r.hooks[hook] || { runs: 0, chars: 0, event: h.event });
@@ -126,9 +126,9 @@ function diagnose(sessions, { cfg, days = 14, live = [] } = {}) {
     add({
       key: `rework:${r.name}`, severity: 'low', scope: 'repo', target: r.name,
       title: 'Files rewritten across many prompts',
-      evidence: `${churn.length} files touched in 3+ separate prompts; worst ${churn[0][0].split('/').pop()} (${churn[0][1]}×)`,
+      evidence: `${churn.length} files touched in 3+ separate prompts; worst ${churn[0][0].split(/[\\/]/).pop()} (${churn[0][1]}×)`,
       fix: 'Agree the shape before editing when a file keeps coming back',
-      steps: churn.slice(0, 4).map(([file, count]) => `${file.replace(process.env.HOME || '~', '~')}: ${count} separate prompts`)
+      steps: churn.slice(0, 4).map(([file, count]) => `${file.replace(process.env.HOME || process.env.USERPROFILE || '~', '~')}: ${count} separate prompts`)
         .concat('Settle the structure in one pass before editing when a file keeps returning'),
     });
   }

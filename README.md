@@ -11,11 +11,37 @@ open http://127.0.0.1:4317
 
 Without Docker: `node server.cjs` (reads `~/.claude` directly).
 
+### Windows
+
+Run it with Node directly; no Docker needed. In PowerShell:
+
+```powershell
+winget install OpenJS.NodeJS.LTS   # Node 22+, if missing
+winget install Git.Git             # then open a new terminal so both are on PATH
+git clone https://github.com/khanhnn00/agent-monitor
+cd agent-monitor
+node server.cjs
+Start-Process http://127.0.0.1:4317
+```
+
+- Data is read from `%USERPROFILE%\.claude`; the account usage cache from `%TEMP%\ck-usage-limits-cache.json`.
+- `git clone` fails with `Filename too long` under deep folders: add `-c core.longpaths=true`.
+- To start it at logon, register a scheduled task (run once, from the repo folder):
+
+  ```powershell
+  $a = New-ScheduledTaskAction -Execute (Get-Command node).Source -Argument 'server.cjs' -WorkingDirectory $PWD
+  Register-ScheduledTask agent-monitor -Action $a -Trigger (New-ScheduledTaskTrigger -AtLogOn) -Settings (New-ScheduledTaskSettingsSet -ExecutionTimeLimit 0)
+  ```
+
+  Stop or remove it with `Stop-ScheduledTask agent-monitor` / `Unregister-ScheduledTask agent-monitor`.
+
+Docker Desktop on Windows runs a Linux VM (WSL2 or Hyper-V) and has not been tested here; Node alone needs neither.
+
 ## Features
 
 ### Dashboard — `/`
 
-Updates live over Server-Sent Events. **Live / Last 7 days** switch and a filter box (repo, session, prompt, skill) apply to every panel.
+Updates live over Server-Sent Events. **Live / Last 7 days** switch and a filter box (repo, session, prompt, skill, subagent type, branch) apply to every panel. The filter ignores case and accents (`chay` finds `chạy`); charts and the prompt count narrow to matching prompts, and a session matches on any of its prompts from the last 14 days.
 
 - **Totals**: live sessions (working · stalled · process count), repos live / active in 7 days, subagents running now, prompts today with a 7-day sparkline, skill loads in 7 days and the top skill, delivery reviews (awaiting approval · unapproved changes · contract updates), context paid per session.
 - **Charts**: prompts per day for 14 days stacked by repo, and a day × hour activity heatmap for 7 days; each has a table view.
@@ -58,6 +84,7 @@ How the numbers are made:
 - **Account %** and **session times**: from the cache the `usage-context-awareness` hook writes on the host (`$TMPDIR/ck-usage-limits-cache.json`, source `api/oauth/usage` → `five_hour.utilization`, `resets_at`). Start = `resets_at − 5h`. Sampled every minute into `/data/usage.json`.
 - **This machine's tokens**: assistant-message `usage` from `~/.claude/projects/**/*.jsonl`, deduped by message id, priced at API list rates per model and cache tier.
 - **This machine's %** (estimate): API-equivalent $ × the lowest %-per-$ seen across sessions with ≥5% utilisation, capped at the account %. Accurate once this machine has had one session largely to itself; if machines always overlap, it overstates this machine.
+- **Without the cache** (e.g. Windows without cc-distribution): sessions are rebuilt from this machine's own messages — a session starts at the hour of the first message after the previous one ended. Account % shows `—`; tokens and API-equivalent cost are still shown.
 
 ## Data sources
 
@@ -71,6 +98,18 @@ How the numbers are made:
 | `$TMPDIR/ck-usage-limits-cache.json` | `usage-context-awareness` hook | account usage % |
 
 Without the cc-distribution hooks, only live sessions, subagents and token usage are shown.
+
+### Ledger hooks (without cc-distribution)
+
+`hooks/ledger.cjs` is a minimal, dependency-free hook that writes `harness/sessions/<id>.json` and `harness/skill-stats.json` in the same shape, so prompts, activity, skills, the session timeline and the context / tool-error / rework concerns fill in. It runs on `SessionStart`, `UserPromptSubmit` and `Stop` (~80 ms each), reads the turn back from the transcript on `Stop`, prints nothing and always exits 0. On `Stop` it also fills the context-overhead listing (CLAUDE.md, skill, agent and deferred-tool listings) from the transcript's listing attachments, and strips `<system-reminder>` blocks from recorded prompts. It does not produce hook costs or approval-gate chips.
+
+```bash
+node hooks/install.cjs --dry-run    # show the hooks block it would add
+node hooks/install.cjs              # add it to ~/.claude/settings.json (backs the file up first)
+node hooks/install.cjs --uninstall  # remove it
+```
+
+The hook command points at this checkout, so keep the repo where it is (or re-run the installer after moving it). Sessions started after installing are recorded; restart open ones.
 
 ## API
 
@@ -99,5 +138,6 @@ lib/state.cjs           sessions, subagents, skills, overhead, concerns from ~/.
 lib/usage-local.cjs     transcript scan → per-minute cost buckets; account cache reader
 lib/usage-view.cjs      session store, calibration, /api/usage payload
 shared/harness-diagnose.cjs   concern rules (copy of cc-distribution hooks/lib/harness-diagnose.cjs)
+hooks/ledger.cjs        optional minimal hook writing the harness ledger; hooks/install.cjs registers it
 public/                 index / concerns / usage pages, charts.js, app.css
 ```

@@ -15,15 +15,20 @@ function render(v) {
   if (!w) { $('#current').innerHTML = '<div class="card empty big">No sample for the current 5-hour session yet — it appears after the next prompt on this machine.</div>'; return; }
   const m = w.mine;
   const mine = w.minePercent;
+  const acct = w.utilization;
+  // A local window has no account sample: the session is rebuilt from this machine's own messages.
+  const acctSub = w.local ? 'no account sample — local estimate from transcripts' : `sampled ${ago(w.sampledAt)}`;
+  const mineSub = mine == null ? (w.local ? `$${m.cost.toFixed(2)} API-equivalent here` : 'needs one session ≥5% with activity here')
+    : acct == null ? 'estimated from past calibration' : `${acct ? Math.round((mine / acct) * 100) : 0}% of the account's usage`;
   $('#current').innerHTML = `<div class="stats">
-      <div class="stat hi"><div class="stat-label">Session</div><div class="stat-value">${hm(w.start)} → ${hm(w.end)}</div><div class="stat-sub">${day(w.start)} · resets in ${left(w.end)}</div></div>
-      <div class="stat"><div class="stat-label">Account used</div><div class="stat-value">${pct(w.utilization)}</div><div class="stat-sub">sampled ${ago(w.sampledAt)}</div></div>
-      <div class="stat"><div class="stat-label">This machine used</div><div class="stat-value">${mine == null ? '—' : pct(mine)}</div><div class="stat-sub">${mine == null ? 'needs one session ≥5% with activity here' : `${w.utilization ? Math.round((mine / w.utilization) * 100) : 0}% of the account's usage`}</div></div>
+      <div class="stat hi"><div class="stat-label">Session</div><div class="stat-value">${hm(w.start)} → ${hm(w.end)}</div><div class="stat-sub">${day(w.start)} · resets in ${left(w.end)}${w.local ? ' (estimated)' : ''}</div></div>
+      <div class="stat"><div class="stat-label">Account used</div><div class="stat-value">${acct == null ? '—' : pct(acct)}</div><div class="stat-sub">${esc(acctSub)}</div></div>
+      <div class="stat"><div class="stat-label">This machine used</div><div class="stat-value">${mine == null ? '—' : pct(mine)}</div><div class="stat-sub">${esc(mineSub)}</div></div>
     </div>
     <div class="card u-now">
-      <div class="u-meter tall" role="img" aria-label="${pct(w.utilization)} of the session limit used, ${mine == null ? 'this machine unknown' : pct(mine) + ' by this machine'}">
-        <span class="u-seg" style="width:${mine || 0}%;background:${MINE}"></span><span class="u-seg" style="width:${Math.max(0, w.utilization - (mine || 0))}%;background:var(--series-other)"></span>
-      </div>
+      ${acct == null && mine == null ? '' : `<div class="u-meter tall" role="img" aria-label="${acct == null ? 'account unknown' : `${pct(acct)} of the session limit used`}, ${mine == null ? 'this machine unknown' : pct(mine) + ' by this machine'}">
+        <span class="u-seg" style="width:${mine || 0}%;background:${MINE}"></span><span class="u-seg" style="width:${Math.max(0, (acct || 0) - (mine || 0))}%;background:var(--series-other)"></span>
+      </div>`}
       <table class="tbl u-tbl"><thead><tr><th>Active on this machine</th><th class="num">Msgs</th><th class="num">In / out tok</th><th class="num">API-equiv.</th></tr></thead><tbody><tr>
         <td class="mono">${m.first ? `${hm(m.first)} – ${hm(m.last + 60000)}` : '<span class="muted">No activity this session</span>'}</td>
         <td class="num">${m.messages}</td>
