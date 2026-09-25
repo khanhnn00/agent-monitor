@@ -35,12 +35,7 @@ Start-Process http://127.0.0.1:4317
 
   Stop or remove it with `Stop-ScheduledTask agent-monitor` / `Unregister-ScheduledTask agent-monitor`.
 
-With Docker Desktop, `HOME` and `TMPDIR` are usually unset on Windows, so set them in a `.env` file next to `docker-compose.yml` before `docker compose up -d --build`:
-
-```ini
-HOME=C:/Users/<you>
-TMPDIR=C:/Users/<you>/AppData/Local/Temp
-```
+Docker Desktop on Windows runs a Linux VM (WSL2 or Hyper-V) and has not been tested here; Node alone needs neither.
 
 ## Features
 
