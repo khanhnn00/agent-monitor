@@ -11,6 +11,37 @@ open http://127.0.0.1:4317
 
 Without Docker: `node server.cjs` (reads `~/.claude` directly).
 
+### Windows
+
+Run it with Node directly; no Docker needed. In PowerShell:
+
+```powershell
+winget install OpenJS.NodeJS.LTS   # Node 22+, if missing
+winget install Git.Git             # then open a new terminal so both are on PATH
+git clone https://github.com/khanhnn00/agent-monitor
+cd agent-monitor
+node server.cjs
+Start-Process http://127.0.0.1:4317
+```
+
+- Data is read from `%USERPROFILE%\.claude`; the account usage cache from `%TEMP%\ck-usage-limits-cache.json`.
+- `git clone` fails with `Filename too long` under deep folders: add `-c core.longpaths=true`.
+- To start it at logon, register a scheduled task (run once, from the repo folder):
+
+  ```powershell
+  $a = New-ScheduledTaskAction -Execute (Get-Command node).Source -Argument 'server.cjs' -WorkingDirectory $PWD
+  Register-ScheduledTask agent-monitor -Action $a -Trigger (New-ScheduledTaskTrigger -AtLogOn) -Settings (New-ScheduledTaskSettingsSet -ExecutionTimeLimit 0)
+  ```
+
+  Stop or remove it with `Stop-ScheduledTask agent-monitor` / `Unregister-ScheduledTask agent-monitor`.
+
+With Docker Desktop, `HOME` and `TMPDIR` are usually unset on Windows, so set them in a `.env` file next to `docker-compose.yml` before `docker compose up -d --build`:
+
+```ini
+HOME=C:/Users/<you>
+TMPDIR=C:/Users/<you>/AppData/Local/Temp
+```
+
 ## Features
 
 ### Dashboard — `/`

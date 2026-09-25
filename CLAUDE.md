@@ -27,6 +27,7 @@ Local read-only dashboard over `~/.claude`: Claude Code sessions per repo, harne
 
 - `shared/harness-diagnose.cjs` is a copy of `cc-distribution/hooks/lib/harness-diagnose.cjs` — changes do not sync
 - Account % comes from the host hook's cache in `$TMPDIR`; compose mounts `${TMPDIR:-/tmp}` at `/host-tmp`
+- Session `cwd` / transcript paths are host paths: on a Windows host they stay `C:\...` inside the Linux container, so split on both separators (`base()` in `state.cjs`), never `path.basename`
 - `five_hour.utilization` is a whole percent; calibration ignores windows under 5%
 - This machine's % is an estimate (lowest %-per-$ across windows); it overstates when machines always overlap
 - Transcript lines repeat `usage` per content block — dedupe by `message.id`
